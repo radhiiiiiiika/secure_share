@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — SecureShare AES</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a href="{{ url_for('dashboard') }}" class="nav-logo">
+      <div class="nav-logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <span class="nav-logo-text">Secure<span>Share</span></span>
+    </a>
+
+    <ul class="nav-links">
+      <li><a href="{{ url_for('dashboard') }}" class="active"><i class="fa-solid fa-grid-2"></i> Dashboard</a></li>
+      <li><a href="{{ url_for('upload_file') }}"><i class="fa-solid fa-cloud-arrow-up"></i> Upload</a></li>
+      <li><a href="{{ url_for('logs') }}"><i class="fa-solid fa-scroll"></i> Logs</a></li>
+    </ul>
+
+    <div class="nav-user">
+      <div class="context-indicator">
+        <div class="context-dot"></div>
+        Context Active
+      </div>
+      <span class="nav-badge badge-{{ current_user.role if current_user is defined else 'user' }}">
+        {{ current_user.role | upper if current_user is defined else 'USER' }}
+      </span>
+      <span style="font-family:var(--font-mono); font-size:13px; color:var(--text-secondary);">
+        {{ current_user.username if current_user is defined else 'guest' }}
+      </span>
+      <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm">
+        <i class="fa-solid fa-right-from-bracket"></i> Logout
+      </a>
+    </div>
+  </nav>
+
+  <!-- LAYOUT -->
+  <div class="layout-with-sidebar">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Navigation</div>
+        <a href="{{ url_for('dashboard') }}" class="sidebar-item active">
+          <span class="icon"><i class="fa-solid fa-grid-2"></i></span> Dashboard
+        </a>
+        <a href="{{ url_for('upload_file') }}" class="sidebar-item">
+          <span class="icon"><i class="fa-solid fa-cloud-arrow-up"></i></span> Upload File
+        </a>
+        <a href="{{ url_for('logs') }}" class="sidebar-item">
+          <span class="icon"><i class="fa-solid fa-scroll"></i></span> Access Logs
+        </a>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Filters</div>
+        <a href="{{ url_for('dashboard') }}?filter=all" class="sidebar-item {% if not request.args.get('filter') or request.args.get('filter') == 'all' %}active{% endif %}">
+          <span class="icon"><i class="fa-solid fa-layer-group"></i></span> All Files
+        </a>
+        <a href="{{ url_for('dashboard') }}?filter=accessible" class="sidebar-item {% if request.args.get('filter') == 'accessible' %}active{% endif %}">
+          <span class="icon"><i class="fa-solid fa-unlock"></i></span> Accessible
+        </a>
+        <a href="{{ url_for('dashboard') }}?filter=restricted" class="sidebar-item {% if request.args.get('filter') == 'restricted' %}active{% endif %}">
+          <span class="icon"><i class="fa-solid fa-lock"></i></span> Restricted
+        </a>
+        <a href="{{ url_for('dashboard') }}?filter=mine" class="sidebar-item {% if request.args.get('filter') == 'mine' %}active{% endif %}">
+          <span class="icon"><i class="fa-solid fa-user"></i></span> My Uploads
+        </a>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Session</div>
+        <div style="padding: 0 8px;">
+          <div style="font-family:var(--font-tech); font-size:10px; color:var(--text-muted); letter-spacing:0.06em; margin-bottom:6px;">CURRENT USER</div>
+          <div style="font-family:var(--font-mono); font-size:12px; color:var(--text-primary);">
+            {{ current_user.username if current_user is defined else 'guest' }}
+          </div>
+          <div class="mt-1">
+            <span class="nav-badge badge-{{ current_user.role if current_user is defined else 'user' }}" style="font-size:10px;">
+              {{ current_user.role | upper if current_user is defined else 'USER' }}
+            </span>
+          </div>
+          <div style="font-family:var(--font-tech); font-size:10px; color:var(--text-muted); margin-top:10px; letter-spacing:0.04em;">
+            <i class="fa-solid fa-clock" style="color:var(--cyan); margin-right:4px;"></i>
+            <span id="sessionTime">--:--:--</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main-content">
+
+      <!-- Breadcrumb -->
+      <div class="page-breadcrumb">
+        <span>SecureShare</span> / Dashboard
+      </div>
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <div class="page-header-top">
+          <div>
+            <h1 class="page-title">File Dashboard</h1>
+            <p class="page-subtitle">Context-aware access · Your role: <span class="text-cyan">{{ current_user.role | capitalize if current_user is defined else 'User' }}</span></p>
+          </div>
+          <div class="flex gap-2 items-center">
+            <a href="{{ url_for('upload_file') }}" class="btn btn-primary">
+              <i class="fa-solid fa-plus"></i> Upload File
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Flash messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ 'error' if category == 'danger' else category }}">
+              <span class="alert-icon">
+                {% if category == 'danger' %}<i class="fa-solid fa-circle-xmark"></i>
+                {% elif category == 'success' %}<i class="fa-solid fa-circle-check"></i>
+                {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
+              </span>
+              <span class="alert-content">{{ message }}</span>
+              <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <!-- Stats -->
+      <div class="stats-grid stagger">
+        <div class="stat-card cyan">
+          <div class="stat-icon"><i class="fa-solid fa-files"></i></div>
+          <div class="stat-value">{{ files | length if files is defined else '0' }}</div>
+          <div class="stat-label">Total Files</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-icon"><i class="fa-solid fa-unlock-keyhole"></i></div>
+          <div class="stat-value">{{ accessible_count if accessible_count is defined else '0' }}</div>
+          <div class="stat-label">Accessible</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-icon"><i class="fa-solid fa-lock"></i></div>
+          <div class="stat-value">{{ restricted_count if restricted_count is defined else '0' }}</div>
+          <div class="stat-label">Restricted</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-icon"><i class="fa-solid fa-ban"></i></div>
+          <div class="stat-value">{{ denied_today if denied_today is defined else '0' }}</div>
+          <div class="stat-label">Denied Today</div>
+        </div>
+      </div>
+
+      <!-- Search & Filters -->
+      <div class="card mb-6" style="margin-bottom:24px;">
+        <div class="card-body" style="padding:16px 20px;">
+          <div class="filter-bar">
+            <div class="search-wrapper">
+              <span class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+              <input type="text" class="search-input" placeholder="Search files..." id="fileSearch" oninput="filterFiles()" />
+            </div>
+            <select class="filter-select" id="roleFilter" onchange="filterFiles()">
+              <option value="">All Roles</option>
+              <option value="admin">Admin</option>
+              <option value="user">User</option>
+              <option value="viewer">Viewer</option>
+            </select>
+            <select class="filter-select" id="statusFilter" onchange="filterFiles()">
+              <option value="">All Status</option>
+              <option value="accessible">Accessible</option>
+              <option value="restricted">Restricted</option>
+            </select>
+            <select class="filter-select" id="sortFilter" onchange="filterFiles()">
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="name">Name A–Z</option>
+            </select>
+            <span style="font-family:var(--font-tech); font-size:11px; color:var(--text-muted); margin-left:auto;" id="fileCount">
+              <!-- filled by JS -->
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Files Grid -->
+      <div class="files-grid stagger" id="filesGrid">
+
+        {% if files is defined and files %}
+          {% for file in files %}
+          <div class="file-card" data-name="{{ file.filename }}" data-role="{{ file.allowed_role }}" data-accessible="{{ 'true' if file.is_accessible else 'false' }}">
+
+            <div class="file-lock-indicator {{ 'unlocked' if file.is_accessible else 'locked' }}">
+              <i class="fa-solid {{ 'fa-lock-open' if file.is_accessible else 'fa-lock' }}"></i>
+            </div>
+
+            <div class="file-card-icon">
+              {% set ext = file.filename.split('.')[-1].lower() %}
+              {% if ext in ['pdf'] %}<i class="fa-solid fa-file-pdf"></i>
+              {% elif ext in ['jpg','jpeg','png','gif','webp'] %}<i class="fa-solid fa-file-image"></i>
+              {% elif ext in ['doc','docx'] %}<i class="fa-solid fa-file-word"></i>
+              {% elif ext in ['xls','xlsx','csv'] %}<i class="fa-solid fa-file-excel"></i>
+              {% elif ext in ['zip','tar','gz'] %}<i class="fa-solid fa-file-zipper"></i>
+              {% elif ext in ['py','js','html','css','json'] %}<i class="fa-solid fa-file-code"></i>
+              {% else %}<i class="fa-solid fa-file"></i>{% endif %}
+            </div>
+
+            <div class="file-card-name" title="{{ file.filename }}">{{ file.filename }}</div>
+            <div class="file-card-meta">
+              {{ ((file.file_size / 1024) | round(1)) if file.file_size is defined else '-' }} KB &nbsp;&nbsp;
+              Uploaded {{ file.upload_date if file.upload_date is defined else 'Unknown' }}
+            </div>
+
+            <div class="file-card-tags">
+              <span class="tag tag-role"><i class="fa-solid fa-user-tag"></i> {{ file.allowed_role | capitalize }}</span>
+              {% if file.allowed_time_start and file.allowed_time_end %}
+                <span class="tag tag-time"><i class="fa-solid fa-clock"></i> {{ file.allowed_time_start }}–{{ file.allowed_time_end }}</span>
+              {% endif %}
+              {% if file.max_downloads %}
+                <span class="tag tag-limit"><i class="fa-solid fa-arrow-down"></i> {{ file.download_count }}/{{ file.max_downloads }}</span>
+              {% endif %}
+            </div>
+
+            <div class="file-card-actions">
+              {% if file.is_accessible %}
+                <a href="{{ url_for('download_file', file_id=file.id) }}" class="btn btn-primary btn-sm" style="flex:1; justify-content:center;">
+                  <i class="fa-solid fa-download"></i> Download
+                </a>
+              {% else %}
+                <button class="btn btn-ghost btn-sm" style="flex:1; justify-content:center; cursor:not-allowed; opacity:0.5;" disabled>
+                  <i class="fa-solid fa-ban"></i> Restricted
+                </button>
+              {% endif %}
+              <button class="btn-icon" data-tooltip="File details" onclick="showFileDetails('{{ file.id }}')">
+                <i class="fa-solid fa-circle-info"></i>
+              </button>
+              {% if current_user is defined and (current_user.role == 'admin' or file.owner_id == current_user.id) %}
+                <a href="{{ url_for('delete_file', file_id=file.id) }}" class="btn-icon" data-tooltip="Delete" style="color:var(--red);" onclick="return confirm('Delete this file?')">
+                  <i class="fa-solid fa-trash"></i>
+                </a>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+
+        {% else %}
+          <!-- Empty state -->
+          <div style="grid-column: 1/-1; text-align:center; padding:60px 32px;">
+            <div style="font-size:48px; color:var(--text-muted); margin-bottom:16px;"><i class="fa-solid fa-folder-open"></i></div>
+            <div style="font-family:var(--font-display); font-size:18px; color:var(--text-secondary); margin-bottom:8px;">No files available</div>
+            <div style="font-family:var(--font-mono); font-size:13px; color:var(--text-muted); margin-bottom:24px;">Upload your first encrypted file to get started</div>
+            <a href="{{ url_for('upload_file') }}" class="btn btn-primary">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Upload File
+            </a>
+          </div>
+        {% endif %}
+
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- File Details Modal (hidden by default) -->
+<div class="modal-overlay hidden" id="fileModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fa-solid fa-circle-info text-cyan" style="margin-right:8px;"></i> File Details</div>
+      <button class="btn-icon" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body" id="modalBody">Loading...</div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+// Live clock
+function updateClock() {
+  document.getElementById('sessionTime').textContent = new Date().toLocaleTimeString();
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// File search + filter
+function filterFiles() {
+  const q = document.getElementById('fileSearch').value.toLowerCase();
+  const role = document.getElementById('roleFilter').value.toLowerCase();
+  const status = document.getElementById('statusFilter').value;
+  const cards = document.querySelectorAll('.file-card');
+  let visible = 0;
+  cards.forEach(c => {
+    const name = (c.dataset.name || '').toLowerCase();
+    const cardRole = (c.dataset.role || '').toLowerCase();
+    const accessible = c.dataset.accessible === 'true';
+    const matchQ = !q || name.includes(q);
+    const matchRole = !role || cardRole === role;
+    const matchStatus = !status || (status === 'accessible' ? accessible : !accessible);
+    const show = matchQ && matchRole && matchStatus;
+    c.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  const fc = document.getElementById('fileCount');
+  if (fc) fc.textContent = `${visible} file${visible !== 1 ? 's' : ''} shown`;
+}
+
+// Initialize count
+window.addEventListener('DOMContentLoaded', () => {
+  filterFiles();
+});
+
+// Modal
+function showFileDetails(fileId) {
+  document.getElementById('fileModal').classList.remove('hidden');
+  document.getElementById('modalBody').innerHTML = `
+    <div class="encrypt-visual">
+      <span class="encrypt-key"><i class="fa-solid fa-key"></i></span>
+      <span style="font-size:11px; letter-spacing:0.1em;">FILE ID</span>
+      <span class="encrypt-arrow">→</span>
+      <strong style="color:var(--cyan);">#${fileId}</strong>
+    </div>
+    <div class="mt-3" style="font-family:var(--font-mono); font-size:13px; color:var(--text-secondary);">
+      <p style="margin-bottom:8px;">Encryption: <strong style="color:var(--text-primary);">AES-256-CBC</strong></p>
+      <p style="margin-bottom:8px;">Storage: <strong style="color:var(--text-primary);">encrypted_files/</strong></p>
+      <p>Access: <strong style="color:var(--text-primary);">Context-evaluated at request time</strong></p>
+    </div>`;
+}
+
+function closeModal() {
+  document.getElementById('fileModal').classList.add('hidden');
+}
+
+document.getElementById('fileModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Upload File — SecureShare AES</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a href="{{ url_for('dashboard') }}" class="nav-logo">
+      <div class="nav-logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <span class="nav-logo-text">Secure<span>Share</span></span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="{{ url_for('dashboard') }}"><i class="fa-solid fa-grid-2"></i> Dashboard</a></li>
+      <li><a href="{{ url_for('upload_file') }}" class="active"><i class="fa-solid fa-cloud-arrow-up"></i> Upload</a></li>
+      <li><a href="{{ url_for('logs') }}"><i class="fa-solid fa-scroll"></i> Logs</a></li>
+    </ul>
+    <div class="nav-user">
+      <span class="nav-badge badge-{{ current_user.role if current_user is defined else 'user' }}">
+        {{ current_user.role | upper if current_user is defined else 'USER' }}
+      </span>
+      <span style="font-family:var(--font-mono); font-size:13px; color:var(--text-secondary);">
+        {{ current_user.username if current_user is defined else 'guest' }}
+      </span>
+      <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm">
+        <i class="fa-solid fa-right-from-bracket"></i> Logout
+      </a>
+    </div>
+  </nav>
+
+  <!-- LAYOUT -->
+  <div class="layout-with-sidebar">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Navigation</div>
+        <a href="{{ url_for('dashboard') }}" class="sidebar-item">
+          <span class="icon"><i class="fa-solid fa-grid-2"></i></span> Dashboard
+        </a>
+        <a href="{{ url_for('upload_file') }}" class="sidebar-item active">
+          <span class="icon"><i class="fa-solid fa-cloud-arrow-up"></i></span> Upload File
+        </a>
+        <a href="{{ url_for('logs') }}" class="sidebar-item">
+          <span class="icon"><i class="fa-solid fa-scroll"></i></span> Access Logs
+        </a>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Context Rules</div>
+        <div style="padding: 0 8px; font-family:var(--font-tech); font-size:10px; color:var(--text-muted); line-height:1.8; letter-spacing:0.04em;">
+          <div><i class="fa-solid fa-user-tag" style="color:var(--cyan); width:14px;"></i> Role → who can access</div>
+          <div><i class="fa-solid fa-clock" style="color:var(--amber); width:14px;"></i> Time → when to allow</div>
+          <div><i class="fa-solid fa-arrow-down" style="color:var(--green); width:14px;"></i> Limit → max downloads</div>
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Encryption</div>
+        <div style="padding: 0 8px;">
+          <div style="font-family:var(--font-tech); font-size:10px; color:var(--text-muted); line-height:1.8;">
+            <div><i class="fa-solid fa-lock" style="color:var(--cyan); width:14px;"></i> AES-256-CBC</div>
+            <div><i class="fa-solid fa-key" style="color:var(--amber); width:14px;"></i> Auto key generation</div>
+            <div><i class="fa-solid fa-database" style="color:var(--green); width:14px;"></i> Stored in /encrypted_files</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main-content">
+
+      <div class="page-breadcrumb">
+        <a href="{{ url_for('dashboard') }}" style="color:var(--text-muted); text-decoration:none;">SecureShare</a>
+        &nbsp;/&nbsp; <span>Upload File</span>
+      </div>
+
+      <div class="page-header">
+        <h1 class="page-title">Upload Encrypted File</h1>
+        <p class="page-subtitle">Define context rules for access control · File will be encrypted with AES-256</p>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ 'error' if category == 'danger' else category }}">
+              <span class="alert-icon">
+                {% if category == 'danger' %}<i class="fa-solid fa-circle-xmark"></i>
+                {% elif category == 'success' %}<i class="fa-solid fa-circle-check"></i>
+                {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
+              </span>
+              <span class="alert-content">{{ message }}</span>
+              <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data" id="uploadForm">
+        {{ form.hidden_tag() if form is defined }}
+
+        <div class="grid-2" style="gap:24px; align-items:start;">
+
+          <!-- LEFT COLUMN: File + Context Rules -->
+          <div style="display:flex; flex-direction:column; gap:20px;">
+
+            <!-- Drop Zone -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-file-arrow-up card-title-icon"></i>
+                  File Selection
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                  <span class="upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+                  <div class="upload-text">Drop file here or click to browse</div>
+                  <div class="upload-hint">Max size <strong>50MB</strong> · All file types supported</div>
+                  <input type="file" id="fileInput" name="file" style="display:none;" required onchange="onFileSelect(this)" />
+                </div>
+
+                <!-- Selected file preview -->
+                <div id="filePreview" class="hidden mt-3">
+                  <div style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius);">
+                    <div style="width:36px; height:36px; background:var(--cyan-glow); border-radius:var(--radius); display:flex; align-items:center; justify-content:center; color:var(--cyan); font-size:18px;" id="fileIconPreview">
+                      <i class="fa-solid fa-file"></i>
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                      <div style="font-family:var(--font-mono); font-size:13px; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" id="fileNamePreview">filename.ext</div>
+                      <div style="font-family:var(--font-tech); font-size:11px; color:var(--text-muted);" id="fileSizePreview">0 KB</div>
+                    </div>
+                    <button type="button" class="btn-icon" onclick="clearFile()" style="color:var(--red);">
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                  <div class="progress-bar mt-2" id="uploadProgress" style="display:none;">
+                    <div class="progress-fill" id="progressFill" style="width:0%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Context Rules -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-sliders card-title-icon"></i>
+                  Context Engine Rules
+                </div>
+                <div class="context-indicator" style="font-size:10px;">
+                  <div class="context-dot"></div> Live Preview
+                </div>
+              </div>
+              <div class="card-body">
+
+                <!-- Role Access -->
+                <div class="form-group">
+                  <label class="form-label" for="allowed_role">
+                    <i class="fa-solid fa-user-tag" style="color:var(--cyan); margin-right:4px;"></i>
+                    Allowed Role <span class="required">*</span>
+                  </label>
+                  <select id="allowed_role" name="allowed_role" class="form-control" required onchange="updatePreview()">
+                    <option value="" disabled selected>— Select role —</option>
+                    <option value="admin">Admin</option>
+                    <option value="user">User</option>
+                    <option value="viewer">Viewer</option>
+                    <option value="all">All Roles</option>
+                  </select>
+                  <div class="form-hint">Only users with this exact role can access the file</div>
+                </div>
+
+                <!-- Time Window -->
+                <div class="form-group">
+                  <label class="form-label">
+                    <i class="fa-solid fa-clock" style="color:var(--amber); margin-right:4px;"></i>
+                    Access Time Window
+                  </label>
+                  <div class="grid-2" style="gap:12px;">
+                    <div>
+                      <div style="font-family:var(--font-tech); font-size:10px; color:var(--text-muted); margin-bottom:6px; letter-spacing:0.08em;">FROM</div>
+                      <input type="time" id="time_start" name="time_start" class="form-control" onchange="updatePreview()" />
+                    </div>
+                    <div>
+                      <div style="font-family:var(--font-tech); font-size:10px; color:var(--text-muted); margin-bottom:6px; letter-spacing:0.08em;">UNTIL</div>
+                      <input type="time" id="time_end" name="time_end" class="form-control" onchange="updatePreview()" />
+                    </div>
+                  </div>
+                  <div class="form-hint">Leave blank to allow access at any time</div>
+                </div>
+
+                <!-- Download Limit -->
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label" for="max_downloads">
+                    <i class="fa-solid fa-arrow-down-to-line" style="color:var(--green); margin-right:4px;"></i>
+                    Download Limit
+                  </label>
+                  <input
+                    type="number"
+                    id="max_downloads"
+                    name="max_downloads"
+                    class="form-control"
+                    placeholder="e.g. 10 (leave blank for unlimited)"
+                    min="1"
+                    oninput="updatePreview()"
+                  />
+                  <div class="form-hint">Maximum number of times this file can be downloaded</div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RIGHT COLUMN: Metadata + Preview -->
+          <div style="display:flex; flex-direction:column; gap:20px;">
+
+            <!-- File Metadata -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-tag card-title-icon"></i>
+                  File Metadata
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label class="form-label" for="description">Description</label>
+                  <textarea
+                    id="description"
+                    name="description"
+                    class="form-control"
+                    rows="3"
+                    placeholder="Brief description of this file..."
+                    style="resize:vertical;"
+                  ></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label" for="tags">Tags</label>
+                  <input type="text" id="tags" name="tags" class="form-control" placeholder="e.g. confidential, finance, Q4" />
+                  <div class="form-hint">Comma-separated tags for organization</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Context Preview Panel -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-eye card-title-icon"></i>
+                  Access Rule Preview
+                </div>
+              </div>
+              <div class="card-body">
+                <div id="contextPreview" style="font-family:var(--font-tech); font-size:12px; letter-spacing:0.04em;">
+                  <div style="display:flex; flex-direction:column; gap:10px;">
+
+                    <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius);">
+                      <i class="fa-solid fa-user-tag" style="color:var(--cyan); width:14px;"></i>
+                      <span style="color:var(--text-muted);">Role:</span>
+                      <span id="previewRole" style="color:var(--text-primary);">Not set</span>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius);">
+                      <i class="fa-solid fa-clock" style="color:var(--amber); width:14px;"></i>
+                      <span style="color:var(--text-muted);">Time:</span>
+                      <span id="previewTime" style="color:var(--text-primary);">Anytime</span>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius);">
+                      <i class="fa-solid fa-arrow-down" style="color:var(--green); width:14px;"></i>
+                      <span style="color:var(--text-muted);">Limit:</span>
+                      <span id="previewLimit" style="color:var(--text-primary);">Unlimited</span>
+                    </div>
+
+                  </div>
+
+                  <div id="previewSummary" style="margin-top:16px; padding:12px 14px; background:var(--cyan-glow); border:1px solid rgba(0,212,255,0.2); border-radius:var(--radius); color:var(--cyan); font-size:11px; line-height:1.6;">
+                    <i class="fa-solid fa-circle-info" style="margin-right:6px;"></i>
+                    Configure rules above to see the access policy summary.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Encryption Info -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-lock card-title-icon"></i>
+                  Encryption Details
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="encrypt-visual">
+                  <span class="encrypt-key"><i class="fa-solid fa-key"></i></span>
+                  <span style="font-size:11px;">AES-256-CBC</span>
+                  <span class="encrypt-arrow"><i class="fa-solid fa-arrow-right"></i></span>
+                  <span style="color:var(--text-primary); font-size:11px;">encrypted_files/</span>
+                </div>
+                <div style="margin-top:12px; font-family:var(--font-tech); font-size:10px; color:var(--text-muted); line-height:1.8; letter-spacing:0.04em;">
+                  <div><i class="fa-solid fa-check" style="color:var(--green); margin-right:6px;"></i> Unique IV per file</div>
+                  <div><i class="fa-solid fa-check" style="color:var(--green); margin-right:6px;"></i> Key derived from master secret</div>
+                  <div><i class="fa-solid fa-check" style="color:var(--green); margin-right:6px;"></i> Filename obfuscated in storage</div>
+                  <div><i class="fa-solid fa-check" style="color:var(--green); margin-right:6px;"></i> Decrypted only on authorized access</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Submit -->
+            <button type="submit" class="btn btn-primary btn-lg w-full" id="submitBtn" style="justify-content:center;" disabled>
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              Encrypt &amp; Upload
+            </button>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-ghost w-full" style="justify-content:center;">
+              <i class="fa-solid fa-arrow-left"></i> Cancel
+            </a>
+
+          </div>
+        </div>
+      </form>
+
+    </main>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const submitBtn = document.getElementById('submitBtn');
+
+// Drag & Drop
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    fileInput.files = e.dataTransfer.files;
+    onFileSelect({ files: [file] });
+  }
+});
+
+function onFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const preview = document.getElementById('filePreview');
+  preview.classList.remove('hidden');
+  document.getElementById('fileNamePreview').textContent = file.name;
+  const size = file.size < 1024 * 1024
+    ? (file.size / 1024).toFixed(1) + ' KB'
+    : (file.size / 1024 / 1024).toFixed(2) + ' MB';
+  document.getElementById('fileSizePreview').textContent = size;
+
+  // Icon based on extension
+  const ext = file.name.split('.').pop().toLowerCase();
+  const iconMap = {
+    pdf: 'fa-file-pdf', jpg: 'fa-file-image', jpeg: 'fa-file-image', png: 'fa-file-image',
+    doc: 'fa-file-word', docx: 'fa-file-word', xls: 'fa-file-excel', xlsx: 'fa-file-excel',
+    zip: 'fa-file-zipper', py: 'fa-file-code', js: 'fa-file-code', html: 'fa-file-code',
+  };
+  const icon = iconMap[ext] || 'fa-file';
+  document.getElementById('fileIconPreview').innerHTML = `<i class="fa-solid ${icon}"></i>`;
+
+  submitBtn.removeAttribute('disabled');
+  updatePreview();
+}
+
+function clearFile() {
+  fileInput.value = '';
+  document.getElementById('filePreview').classList.add('hidden');
+  submitBtn.setAttribute('disabled', true);
+}
+
+function updatePreview() {
+  const role = document.getElementById('allowed_role').value;
+  const ts = document.getElementById('time_start').value;
+  const te = document.getElementById('time_end').value;
+  const dl = document.getElementById('max_downloads').value;
+
+  document.getElementById('previewRole').textContent = role
+    ? { admin: 'Admin only', user: 'User and above', viewer: 'All roles' }[role] : 'Not set';
+  document.getElementById('previewTime').textContent = (ts && te) ? `${ts} – ${te}` : 'Anytime';
+  document.getElementById('previewLimit').textContent = dl ? `${dl} downloads max` : 'Unlimited';
+
+  const parts = [];
+  if (role) parts.push(`accessible to <strong style="color:var(--cyan);">${({ admin: 'Admins', user: 'Users+', viewer: 'Everyone' })[role]}</strong>`);
+  if (ts && te) parts.push(`between <strong style="color:var(--amber);">${ts}–${te}</strong>`);
+  if (dl) parts.push(`up to <strong style="color:var(--green);">${dl} downloads</strong>`);
+
+  document.getElementById('previewSummary').innerHTML = parts.length
+    ? `<i class="fa-solid fa-shield-halved" style="margin-right:6px;"></i> This file will be ${parts.join(', ')}.`
+    : `<i class="fa-solid fa-circle-info" style="margin-right:6px;"></i> Configure rules above to see the access policy summary.`;
+}
+
+// Animate progress on submit
+document.getElementById('uploadForm').addEventListener('submit', function() {
+  const pbar = document.getElementById('uploadProgress');
+  const fill = document.getElementById('progressFill');
+  pbar.style.display = '';
+  let w = 0;
+  const iv = setInterval(() => {
+    w = Math.min(w + Math.random() * 15, 90);
+    fill.style.width = w + '%';
+    if (w >= 90) clearInterval(iv);
+  }, 200);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register — SecureShare AES</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="page-wrapper">
+  <div class="auth-page">
+
+    <div class="auth-card fade-in" style="max-width: 480px;">
+      <!-- Header -->
+      <div class="auth-header">
+        <div class="auth-logo">
+          <i class="fa-solid fa-user-plus"></i>
+        </div>
+        <div class="auth-title">Create Account</div>
+        <div class="auth-subtitle">Role-based access · Encrypted vault</div>
+      </div>
+
+      <!-- Body -->
+      <div class="auth-body">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'error' if category == 'danger' else category }}">
+                <span class="alert-icon">
+                  {% if category == 'danger' %}<i class="fa-solid fa-circle-xmark"></i>
+                  {% elif category == 'success' %}<i class="fa-solid fa-circle-check"></i>
+                  {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
+                </span>
+                <span class="alert-content">{{ message }}</span>
+                <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('register') }}" id="registerForm">
+
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label" for="first_name">First Name <span class="required">*</span></label>
+              <input type="text" id="first_name" name="first_name" class="form-control" placeholder="First Name" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="last_name">Last Name</label>
+              <input type="text" id="last_name" name="last_name" class="form-control" placeholder="Last Name" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="username">Username <span class="required">*</span></label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              class="form-control"
+              placeholder="unique_username"
+              autocomplete="username"
+              required
+              oninput="checkUsername(this.value)"
+            />
+            <div class="form-hint" id="usernameHint">Only letters, numbers, and underscores. Min 3 chars.</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="email">Email Address</label>
+            <input type="email" id="email" name="email" class="form-control" placeholder="you@example.com" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="role">
+              Access Role <span class="required">*</span>
+              <span style="float:right; font-size:10px; color:var(--cyan); cursor:pointer;" onclick="document.getElementById('roleInfo').classList.toggle('hidden')">
+                <i class="fa-solid fa-circle-info"></i> Role info
+              </span>
+            </label>
+            <select id="role" name="role" class="form-control" required onchange="updateRoleBadge(this.value)">
+              <option value="" disabled selected>— Select a role —</option>
+              <option value="admin">Admin</option>
+              <option value="user">User</option>
+              <option value="viewer">Viewer</option>
+            </select>
+
+            <!-- Role Info Panel -->
+            <div id="roleInfo" class="hidden mt-2" style="background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius); padding:12px;">
+              <div style="display:grid; gap:8px;">
+                <div style="display:flex; gap:10px; align-items:center;">
+                  <span class="nav-badge badge-admin">Admin</span>
+                  <span style="font-family:var(--font-mono); font-size:11px; color:var(--text-secondary);">Full access · Upload, download, manage all files · View logs</span>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                  <span class="nav-badge badge-user">User</span>
+                  <span style="font-family:var(--font-mono); font-size:11px; color:var(--text-secondary);">Standard access · Upload own files · Download permitted files</span>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                  <span class="nav-badge badge-viewer">Viewer</span>
+                  <span style="font-family:var(--font-mono); font-size:11px; color:var(--text-secondary);">Read-only · Download only · No upload permissions</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="password">Password <span class="required">*</span></label>
+            <div style="position:relative;">
+              <input type="password" id="password" name="password" class="form-control" placeholder="Min 8 characters" required oninput="checkPassword(this.value)" style="padding-right:48px;" />
+              <button type="button" class="input-addon" onclick="togglePassword('password', this)" style="background:none; border:none; border-left:1px solid var(--border); cursor:pointer; position:absolute; right:0; top:0; bottom:0; padding:0 12px; color:var(--text-muted);">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+            </div>
+            <!-- Password strength bar -->
+            <div class="progress-bar mt-2">
+              <div class="progress-fill" id="strengthBar" style="width:0%; background: var(--red);"></div>
+            </div>
+            <div class="form-hint" id="strengthLabel" style="margin-top:4px;">Password strength</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="confirm_password">Confirm Password <span class="required">*</span></label>
+            <input type="password" id="confirm_password" name="confirm_password" class="form-control" placeholder="Repeat password" required oninput="checkMatch()" />
+            <div class="form-error hidden" id="matchError">
+              <i class="fa-solid fa-triangle-exclamation"></i> Passwords do not match
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-lg w-full" style="justify-content:center; margin-top:4px;" id="submitBtn">
+            <i class="fa-solid fa-user-shield"></i>
+            Create Secure Account
+          </button>
+        </form>
+
+        <div class="auth-footer">
+          Already have an account? <a href="{{ url_for('login') }}">Sign in</a>
+        </div>
+
+      </div>
+
+      <div class="auth-system-info">
+        <i class="fa-solid fa-lock" style="margin-right:6px; color:var(--cyan);"></i>
+        BCRYPT HASHED · ROLE-BASED ACCESS CONTROL · RBAC v1.3
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+function togglePassword(fieldId, btn) {
+  const field = document.getElementById(fieldId);
+  const icon = btn.querySelector('i');
+  if (field.type === 'password') {
+    field.type = 'text';
+    icon.classList.replace('fa-eye', 'fa-eye-slash');
+  } else {
+    field.type = 'password';
+    icon.classList.replace('fa-eye-slash', 'fa-eye');
+  }
+}
+
+function checkPassword(val) {
+  const bar = document.getElementById('strengthBar');
+  const label = document.getElementById('strengthLabel');
+  let score = 0;
+  if (val.length >= 8) score++;
+  if (/[A-Z]/.test(val)) score++;
+  if (/[0-9]/.test(val)) score++;
+  if (/[^A-Za-z0-9]/.test(val)) score++;
+  const levels = [
+    { pct: '15%', color: 'var(--red)', text: 'Very weak' },
+    { pct: '35%', color: 'var(--red)', text: 'Weak' },
+    { pct: '60%', color: 'var(--amber)', text: 'Fair' },
+    { pct: '80%', color: '#88dd55', text: 'Strong' },
+    { pct: '100%', color: 'var(--green)', text: 'Very strong' },
+  ];
+  const l = levels[score];
+  bar.style.width = l.pct;
+  bar.style.background = l.color;
+  label.textContent = l.text;
+  label.style.color = l.color;
+}
+
+function checkMatch() {
+  const p = document.getElementById('password').value;
+  const c = document.getElementById('confirm_password').value;
+  const err = document.getElementById('matchError');
+  if (c && p !== c) err.classList.remove('hidden');
+  else err.classList.add('hidden');
+}
+
+function checkUsername(val) {
+  const hint = document.getElementById('usernameHint');
+  const valid = /^[a-zA-Z0-9_]{3,}$/.test(val);
+  hint.style.color = val.length === 0 ? 'var(--text-muted)' : valid ? 'var(--green)' : 'var(--red)';
+  hint.textContent = val.length === 0
+    ? 'Only letters, numbers, and underscores. Min 3 chars.'
+    : valid ? '✓ Username looks good' : '✗ Invalid characters or too short';
+}
+
+function updateRoleBadge(val) {
+  // Visual feedback on role select
+  const sel = document.getElementById('role');
+  sel.style.color = val === 'admin' ? 'var(--amber)' : val === 'user' ? 'var(--cyan)' : 'var(--green)';
+}
+</script>
+</body>
+</html>

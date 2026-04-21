@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Access Logs — SecureShare AES</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- ===== NAVBAR: EXACT MATCH TO DASHBOARD ===== -->
+  <nav class="navbar">
+    <a href="{{ url_for('dashboard') }}" class="nav-logo">
+      <div class="nav-logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <span class="nav-logo-text">Secure<span>Share</span></span>
+    </a>
+
+    <ul class="nav-links">
+      <li><a href="{{ url_for('dashboard') }}"><i class="fa-solid fa-grid-2"></i> Dashboard</a></li>
+      <li><a href="{{ url_for('upload_file') }}"><i class="fa-solid fa-cloud-arrow-up"></i> Upload</a></li>
+      <li><a href="{{ url_for('logs') }}" class="active"><i class="fa-solid fa-scroll"></i> Logs</a></li>
+    </ul>
+
+    <div class="nav-user">
+      <div class="context-indicator">
+        <div class="context-dot"></div>
+        Context Active
+      </div>
+      <span class="nav-badge badge-{{ current_user.role if current_user is defined else 'user' }}">
+        {{ current_user.role | upper if current_user is defined else 'USER' }}
+      </span>
+      <span style="font-family:var(--font-mono); font-size:13px; color:var(--text-secondary);">
+        {{ current_user.username if current_user is defined else 'guest' }}
+      </span>
+      <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm">
+        <i class="fa-solid fa-right-from-bracket"></i> Logout
+      </a>
+    </div>
+  </nav>
+
+  <!-- ===== LAYOUT WITH SIDEBAR: EXACT DASHBOARD STRUCTURE ===== -->
+  <div class="layout-with-sidebar">
+
+    <!-- SIDEBAR: IDENTICAL TO DASHBOARD (Navigation, Filters, Session) -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Navigation</div>
+        <a href="{{ url_for('dashboard') }}" class="sidebar-item">
+          <span class="icon"><i class="fa-solid fa-grid-2"></i></span> Dashboard
+        </a>
+        <a href="{{ url_for('upload_file') }}" class="sidebar-item">
+          <span class="icon"><i class="fa-solid fa-cloud-arrow-up"></i></span> Upload File
+        </a>
+        <a href="{{ url_for('logs') }}" class="sidebar-item active">
+          <span class="icon"><i class="fa-solid fa-scroll"></i></span> Access Logs
+        </a>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <!-- Context Rules Section (dashboard style) -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Context Rules</div>
+        <div style="padding: 0 8px; font-family:var(--font-mono); font-size:12px; color:var(--text-secondary); line-height:1.5;">
+          <div><i class="fa-regular fa-user" style="width:18px;"></i> Role → who can access</div>
+          <div><i class="fa-regular fa-clock" style="width:18px;"></i> Time → when to allow</div>
+          <div><i class="fa-solid fa-arrow-down" style="width:18px;"></i> Limit → max downloads</div>
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <!-- Session block (same as dashboard) -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Session</div>
+        <div style="padding: 0 8px;">
+          <div style="font-family:var(--font-tech); font-size:10px; color:var(--text-muted); letter-spacing:0.06em; margin-bottom:6px;">CURRENT USER</div>
+          <div style="font-family:var(--font-mono); font-size:12px; color:var(--text-primary);">
+            {{ current_user.username if current_user is defined else 'guest' }}
+          </div>
+          <div class="mt-1">
+            <span class="nav-badge badge-{{ current_user.role if current_user is defined else 'user' }}" style="font-size:10px;">
+              {{ current_user.role | upper if current_user is defined else 'USER' }}
+            </span>
+          </div>
+          <div style="font-family:var(--font-tech); font-size:10px; color:var(--text-muted); margin-top:10px; letter-spacing:0.04em;">
+            <i class="fa-solid fa-clock" style="color:var(--cyan); margin-right:4px;"></i>
+            <span id="sessionTimeLogs">--:--:--</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT: LOGS TABLE WITH DASHBOARD STYLING & BACK BUTTON -->
+    <main class="main-content">
+
+      <!-- Breadcrumb (matches dashboard style) -->
+      <div class="page-breadcrumb">
+        <span>SecureShare</span> / <span>Access Logs</span>
+      </div>
+
+      <!-- Page Header: with Back to Dashboard button (as requested) -->
+      <div class="page-header">
+        <div class="page-header-top">
+          <div>
+            <h1 class="page-title">Access Logs</h1>
+            <p class="page-subtitle">Real-time access decisions • Context-aware results</p>
+          </div>
+          <div class="flex gap-2 items-center">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
+              <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Flash messages (consistent with dashboard) -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ 'error' if category == 'danger' else category }}">
+              <span class="alert-icon">
+                {% if category == 'danger' %}<i class="fa-solid fa-circle-xmark"></i>
+                {% elif category == 'success' %}<i class="fa-solid fa-circle-check"></i>
+                {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
+              </span>
+              <span class="alert-content">{{ message }}</span>
+              <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <!-- Stats Grid (same style as dashboard stats) -->
+      <div class="stats-grid stagger">
+        <div class="stat-card green">
+          <div class="stat-icon"><i class="fa-solid fa-check-circle"></i></div>
+          <div class="stat-value">
+            {{ logs | selectattr('status', 'equalto', 'ALLOWED') | list | length }}
+          </div>
+          <div class="stat-label">Access Granted</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-icon"><i class="fa-solid fa-ban"></i></div>
+          <div class="stat-value">
+            {{ logs | selectattr('status', 'equalto', 'DENIED') | list | length }}
+          </div>
+          <div class="stat-label">Access Denied</div>
+        </div>
+      </div>
+
+      <!-- Logs Table: dashboard-style card with table container -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-body" style="padding: 0; overflow-x: auto;">
+          <div class="table-container" style="margin: 0;">
+            <table class="data-table" style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr>
+                  <th><i class="fa-regular fa-calendar"></i> Timestamp</th>
+                  <th><i class="fa-regular fa-user"></i> User</th>
+                  <th><i class="fa-regular fa-file"></i> File</th>
+                  <th><i class="fa-solid fa-circle-info"></i> Status</th>
+                  <th><i class="fa-regular fa-message"></i> Reason</th>
+                </tr>
+              </thead>
+              <tbody id="logsTable">
+                {% for log in logs %}
+                <tr>
+                  <td style="font-family: var(--font-mono); font-size: 12px;">{{ log.timestamp }}</td>
+                  <td>{{ log.username }}</td>
+                  <td style="font-weight: 500;">{{ log.filename }}</td>
+                  <td>
+                    {% if log.status == "ALLOWED" %}
+                      <span class="status-badge allowed"><i class="fa-solid fa-check-circle"></i> ALLOWED</span>
+                    {% else %}
+                      <span class="status-badge denied"><i class="fa-solid fa-circle-xmark"></i> DENIED</span>
+                    {% endif %}
+                  </td>
+                  <td style="color: var(--text-secondary); max-width: 280px;">{{ log.reason if log.reason else "—" }}</td>
+                </tr>
+                {% endfor %}
+                {% if logs|length == 0 %}
+                <tr>
+                  <td colspan="5" style="text-align: center; padding: 48px 24px;">
+                    <div style="font-size: 32px; color: var(--text-muted); margin-bottom: 12px;"><i class="fa-solid fa-scroll"></i></div>
+                    <div style="font-family: var(--font-display); font-size: 16px; color: var(--text-secondary);">No access logs found</div>
+                    <div style="font-size: 13px; color: var(--text-muted); margin-top: 8px;">Access decisions will appear here</div>
+                  </td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Live clock script (identical to dashboard) -->
+<script>
+  function updateClock() {
+    const clockSpan = document.getElementById('sessionTimeLogs');
+    if (clockSpan) clockSpan.textContent = new Date().toLocaleTimeString();
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // Optional: hover effects and table row subtle styling are handled by CSS
+  // Ensure that any external JS (like main.js) does not conflict; we keep existing functionalities.
+</script>
+
+<!-- Additional inline style to match dashboard badges and status styling -->
+<style>
+  /* Ensure consistency with dashboard status badges */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 40px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--font-tech, 'Inter', monospace);
+    letter-spacing: 0.02em;
+    background: rgba(0,0,0,0.3);
+  }
+  .status-badge.allowed {
+    background: rgba(46, 213, 115, 0.12);
+    color: #2ed573;
+    border: 1px solid rgba(46, 213, 115, 0.25);
+  }
+  .status-badge.denied {
+    background: rgba(255, 71, 87, 0.12);
+    color: #ff4757;
+    border: 1px solid rgba(255, 71, 87, 0.25);
+  }
+  .data-table th {
+    text-align: left;
+    padding: 16px 20px;
+    background: rgba(0,0,0,0.2);
+    font-family: var(--font-tech, 'Inter');
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .data-table td {
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 13px;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    vertical-align: middle;
+  }
+  .data-table tr:hover td {
+    background: rgba(0, 255, 255, 0.02);
+  }
+  .table-container {
+    overflow-x: auto;
+    border-radius: 12px;
+  }
+  .stat-card .stat-icon {
+    font-size: 24px;
+    opacity: 0.8;
+  }
+  /* ensure back button matches primary style */
+  .btn-primary i, .btn-primary {
+    transition: all 0.2s ease;
+  }
+  .page-header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  @media (max-width: 680px) {
+    .page-header-top {
+      flex-direction: column;
+    }
+  }
+</style>
+</body>
+</html>

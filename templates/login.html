@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — SecureShare AES</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+<div class="page-wrapper">
+  <div class="auth-page">
+
+    <div class="auth-card fade-in">
+      <!-- Header -->
+      <div class="auth-header">
+        <div class="auth-logo">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div class="auth-title">SecureShare</div>
+        <div class="auth-subtitle">AES-256 · Context-Aware File System</div>
+      </div>
+
+      <!-- Body -->
+      <div class="auth-body">
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'error' if category == 'danger' else category }}">
+                <span class="alert-icon">
+                  {% if category == 'danger' %}<i class="fa-solid fa-circle-xmark"></i>
+                  {% elif category == 'success' %}<i class="fa-solid fa-circle-check"></i>
+                  {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
+                </span>
+                <span class="alert-content">{{ message }}</span>
+                <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('login') }}" id="loginForm">
+          {{ form.hidden_tag() if form is defined }}
+
+          <div class="form-group">
+            <label class="form-label" for="username">
+              Username <span class="required">*</span>
+            </label>
+            <div class="input-group">
+              <input
+                type="text"
+                id="username"
+                name="username"
+                class="form-control"
+                placeholder="Enter your username"
+                autocomplete="username"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="password">
+              Password <span class="required">*</span>
+            </label>
+            <div class="input-group" style="position:relative;">
+              <input
+                type="password"
+                id="password"
+                name="password"
+                class="form-control"
+                placeholder="Enter your password"
+                autocomplete="current-password"
+                required
+                style="padding-right: 48px;"
+              />
+              <button type="button" class="input-addon" onclick="togglePassword('password', this)" style="background:none; border:none; border-left: 1px solid var(--border); cursor:pointer;">
+                <i class="fa-solid fa-eye" id="passwordIcon"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between mb-4" style="margin-bottom:20px;">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-family:var(--font-mono); font-size:12px; color:var(--text-secondary);">
+              <input type="checkbox" name="remember" style="accent-color:var(--cyan); width:14px; height:14px;" />
+              Remember session
+            </label>
+            <a href="#" style="font-family:var(--font-mono); font-size:12px; color:var(--cyan); text-decoration:none;">Forgot password?</a>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-lg w-full" style="justify-content:center; letter-spacing:0.05em;">
+            <i class="fa-solid fa-right-to-bracket"></i>
+            Authenticate
+          </button>
+        </form>
+
+        <div class="auth-footer">
+          No account? <a href="{{ url_for('register') }}">Create one</a>
+        </div>
+
+      </div>
+
+      <!-- System info -->
+      <div class="auth-system-info">
+        <i class="fa-solid fa-lock" style="margin-right:6px; color:var(--cyan);"></i>
+        SECURED · AES-256-CBC · CONTEXT ENGINE v2.1
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+function togglePassword(fieldId, btn) {
+  const field = document.getElementById(fieldId);
+  const icon = btn.querySelector('i');
+  if (field.type === 'password') {
+    field.type = 'text';
+    icon.classList.replace('fa-eye', 'fa-eye-slash');
+  } else {
+    field.type = 'password';
+    icon.classList.replace('fa-eye-slash', 'fa-eye');
+  }
+}
+</script>
+</body>
+</html>
